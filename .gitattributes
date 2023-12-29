@@ -1,0 +1,2 @@
+data/CanCensus2021_2023Ridings/98-401-X2021029_English_CSV_data.csv filter=lfs diff=lfs merge=lfs -text
+data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv filter=lfs diff=lfs merge=lfs -text
