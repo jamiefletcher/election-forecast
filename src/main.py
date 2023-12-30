@@ -16,7 +16,7 @@ ELECTION_2019_T9 = "data/Results/43rd_table_tableau09.csv"
 ELECTION_2015_T9 = "data/Results/42nd_table_tableau09.csv"
 ZERO_COUNTS = 0.25
 BLANK_RECORD = {
-    "id": 0 , 
+    "id": "", 
     "LIB": 0, 
     "CON": 0, 
     "NDP": 0, 
@@ -122,7 +122,7 @@ def load_results_t12(filepath, year):
 
 def load_results_t9(filepath, year):
     record = BLANK_RECORD.copy()
-    record["id"] = 1                    # using the national totals as weights, so keep id field as 1 (no scaling)
+    record.pop("id")                                # not needed at national level
     with open(filepath) as csvfile:
         dialect = csv.Sniffer().sniff(csvfile.read(1024))
         csvfile.seek(0)
@@ -134,7 +134,7 @@ def load_results_t9(filepath, year):
     return record
 
 def prepare_census():
-    print("Reading Census Data ... ", end="", flush=True)
+    print("Reading census data ... ", end="", flush=True)
     census_2013_ridings = load_census(CENSUS_2013R, geo_level="Federal electoral district")
     df_census = pd.DataFrame.from_records(census_2013_ridings.data)
     df_census.columns = df_census.columns.astype(str)
@@ -157,7 +157,7 @@ def prepare_census():
     df_census_scaled = preprocessing.fit_transform(df_census)
     # Convert back to pd.DataFrame
     feature_names = preprocessing.get_feature_names_out()
-    id_idx = np.argwhere(feature_names == "remainder__id")[0]   # id column needs to keep its name
+    id_idx = np.argwhere(feature_names == "remainder__id")[0]       # id column needs to keep its name
     feature_names[id_idx] = "id"
     df_census_scaled = pd.DataFrame(data=df_census_scaled, columns=feature_names)
     print("Done")
@@ -165,33 +165,39 @@ def prepare_census():
     return df_census_scaled
 
 def prepare_elections():
-    riding_results = {
+    riding_result_files = {
         2021: ELECTION_2021_T12,
         2019: ELECTION_2019_T12,
         2015: ELECTION_2015_T12
     }
-    national_results = {
+    national_result_files = {
         2021: ELECTION_2021_T9,
         2019: ELECTION_2019_T9,
         2015: ELECTION_2015_T9
     }
-    dfs = {}
-    weights = {}  
-    print("Reading Election Data - Riding Level ... ", end="", flush=True)    
-    for year, path in riding_results.items():
+    riding_results = {}
+    national_results = {}  
+    print("Reading election data - riding level ... ", end="", flush=True)    
+    for year, path in riding_result_files.items():
         df = pd.DataFrame.from_records(data = load_results_t12(path, year))
-        dfs[year] = df
+        riding_results[year] = df
     print("Done")
-    print("Reading Election Data - National Level ... ", end="", flush=True)    
-    for year, path in national_results.items():
-        weights[year] = load_results_t9(path, year)
+    print("Reading election data - national level ... ", end="", flush=True)    
+    for year, path in national_result_files.items():
+        national_results[year] = load_results_t9(path, year)
     print("Done")
-    print(weights)
-    return dfs
+    print("Rescale riding level data to multiples of national result ... ", end="", flush=True) 
+    for year in riding_result_files.keys():
+        tmp_cat = riding_results[year][["id", "winner"]]                       # can't do division on strings
+        tmp_num = riding_results[year].drop(["id", "winner"], axis = 1) / national_results[year]
+        riding_results[year] = tmp_num.join(tmp_cat)      
+    print("Done")
+    return riding_results, national_results
 
 def make_xy(df_census, df_elections, target_class, merge_class):
     Xy = []
-    election_list = [x for x in df_elections.items()]               # convert map -> list
+    df_riding_results, df_national_results = df_elections
+    election_list = [x for x in df_riding_results.items()]               # convert map -> list
     for k_target, df_target in election_list:
         target = df_target[[merge_class, target_class]]             # only target and id class (for merge)
         df_feat = [v for k, v in election_list if k != k_target]    # complement of list (i.e. non-target dfs)
