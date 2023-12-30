@@ -1,6 +1,10 @@
 import csv
 import numpy as np
 import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import make_pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 
 # Constants
 CENSUS_2013R = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
@@ -120,7 +124,7 @@ def prepare_census():
     print("Reading Census Data ... ", end="", flush=True)
     census_2013_ridings = load_census(CENSUS_2013R, geo_level="Federal electoral district")
     df_census = pd.DataFrame.from_records(census_2013_ridings.data)
-    df_census.set_index("id", inplace=True)
+    df_census.columns = df_census.columns.astype(str)
     print("Done")
 
     print(f"Dropping census features with missing data ... ", end="")
@@ -131,7 +135,21 @@ def prepare_census():
     df_census.drop(["guid", "name"], axis = 1, inplace = True)
     print("Done")
 
-    return df_census
+    print(f"Rescale census data by Z-score ... ", end="")
+    num_cols = df_census.select_dtypes(include='number').columns.to_list()
+    num_pipeline = make_pipeline(SimpleImputer(strategy='mean'), StandardScaler())
+    preprocessing = ColumnTransformer(
+        [('num', num_pipeline, num_cols)], remainder='passthrough'
+    )
+    df_census_scaled = preprocessing.fit_transform(df_census)
+    # Convert back to pd.DataFrame
+    feature_names = preprocessing.get_feature_names_out()
+    id_idx = np.argwhere(feature_names == "remainder__id")[0]   # id column needs to keep its name
+    feature_names[id_idx] = "id"
+    df_census_scaled = pd.DataFrame(data=df_census_scaled, columns=feature_names)
+    print("Done")
+
+    return df_census_scaled
 
 def prepare_results():
     print("Reading Election Data ... ", end="", flush=True)    
@@ -143,25 +161,41 @@ def prepare_results():
     dfs = {}    
     for year, path in years.items():
         df = pd.DataFrame.from_records(data = load_results_t12(path, year))
-        df.set_index("id", inplace=True)
         df.drop(["year"], axis = 1, inplace = True)
-        df.rename(
-            columns={"winner":f"winner-{year}", "LIB":f"LIB-{year}", "CON":f"CON-{year}", 
-                     "NDP":f"NDP-{year}", "GRN":f"GRN-{year}", "BQ":f"BQ-{year}", "OTH":f"OTH-{year}"},
-            inplace = True
-        )
         dfs[year] = df
     print("Done")
     return dfs
 
 def main():
-    df_results = prepare_results()
-    print(df_results[2021])
-    print(df_results[2019])
-    print(df_results[2015])
-
     df_census = prepare_census()
-    print(df_census)
+    print(df_census.info())
+
+    df_results = prepare_results()
+    print(df_results[2021].info())
+    print(df_results[2019].info())
+    print(df_results[2015].info())
+
+    # predict winner of next election based on previous election results + census
+    Xy_2015 = pd.merge(
+        df_results[2015].drop(["winner"], axis=1),  # drop 2015 winner category
+        df_results[2019][["id", "winner"]],         # merge 2019 winner as target
+        on="id"
+    )
+    Xy_2019 = pd.merge(
+        df_results[2019].drop(["winner"], axis=1),  # drop 2019 winner category
+        df_results[2021][["id", "winner"]],         # merge 2021 winner as target
+        on="id"
+    )
+    Xy = pd.concat([Xy_2015, Xy_2019], ignore_index=True)
+    Xy = pd.merge(Xy, df_census, on="id")
+
+    ids = Xy["id"]
+    y = Xy["winner"]
+    X = Xy.drop(["id", "winner"], axis = 1)
+
+    print(ids)
+    print(y)
+    print(X)
 
 if __name__ == "__main__":
     main()
