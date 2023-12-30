@@ -8,9 +8,12 @@ from sklearn.preprocessing import StandardScaler
 
 # Constants
 CENSUS_2013R = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
-ELECTION_2021_T12 = "data/Results/44th_table_tableau12.csv"
+ELECTION_2021_T12 = "data/Results/44th_table_tableau12.csv" # riding results
 ELECTION_2019_T12 = "data/Results/43rd_table_tableau12.csv"
 ELECTION_2015_T12 = "data/Results/42nd_table_tableau12.csv"
+ELECTION_2021_T9 = "data/Results/44th_table_tableau09.csv"   # national totals
+ELECTION_2019_T9 = "data/Results/43rd_table_tableau09.csv"
+ELECTION_2015_T9 = "data/Results/42nd_table_tableau09.csv"
 ZERO_COUNTS = 0.25
 BLANK_RECORD = {
     "id": 0 , 
@@ -115,10 +118,28 @@ def load_results_t12(filepath, year):
                 record["year"] = year
             if winner != "":
                 record["winner"] = winner
-            record[party] += record[party] + pct
+            record[party] += pct
         # append final record
         results.append(record) 
     return results
+
+def load_results_t9(filepath, year):
+    record = BLANK_RECORD.copy()
+    with open(filepath) as csvfile:
+        dialect = csv.Sniffer().sniff(csvfile.read(1024))
+        csvfile.seek(0)
+        csvreader = csv.DictReader(csvfile, dialect=dialect)
+        for row in csvreader:
+            # print(row)
+            party = prase_party(row["\ufeffPolitical affiliation/Appartenance politique"])
+            pct = float(row["Total"])/100
+            record[party] += pct
+            if party == "OTH":
+                print(row["Total"], pct, record[party])
+    record.pop("year")
+    record.pop("id")
+    record.pop("winner")
+    return record
 
 def prepare_census():
     print("Reading Census Data ... ", end="", flush=True)
@@ -151,51 +172,70 @@ def prepare_census():
 
     return df_census_scaled
 
-def prepare_results():
-    print("Reading Election Data ... ", end="", flush=True)    
-    years = {
+def prepare_elections():
+    riding_results = {
         2021: ELECTION_2021_T12,
         2019: ELECTION_2019_T12,
         2015: ELECTION_2015_T12
     }
-    dfs = {}    
-    for year, path in years.items():
+    national_results = {
+        2021: ELECTION_2021_T9,
+        2019: ELECTION_2019_T9,
+        2015: ELECTION_2015_T9
+    }
+    dfs = {}
+    weights = {}  
+    print("Reading Election Data - Riding Level ... ", end="", flush=True)    
+    for year, path in riding_results.items():
         df = pd.DataFrame.from_records(data = load_results_t12(path, year))
         df.drop(["year"], axis = 1, inplace = True)
         dfs[year] = df
     print("Done")
+    print("Reading Election Data - National Level ... ", end="", flush=True)    
+    for year, path in national_results.items():
+        weights[year] = load_results_t9(path, year)
+    print("Done")
+    print(weights)
     return dfs
 
-def main():
-    df_census = prepare_census()
-    print(df_census.info())
+def make_xy(df_census, df_elections, target_class, merge_class):
+    Xy = []
+    election_list = [x for x in df_elections.items()]               # convert map -> list
+    for k_target, df_target in election_list:
+        target = df_target[[merge_class, target_class]]             # only target and id class (for merge)
+        df_feat = [v for k, v in election_list if k != k_target]    # complement of list (i.e. non-target dfs)
+        for df in df_feat:
+            tmp = df.drop([target_class], axis=1)                   # drop existing winner cat
+            # TODO rescale
+            Xy.append(pd.merge(tmp, target, on=merge_class))        # merge target winner cat
 
-    df_results = prepare_results()
-    print(df_results[2021].info())
-    print(df_results[2019].info())
-    print(df_results[2015].info())
-
-    # predict winner of next election based on previous election results + census
-    Xy_2015 = pd.merge(
-        df_results[2015].drop(["winner"], axis=1),  # drop 2015 winner category
-        df_results[2019][["id", "winner"]],         # merge 2019 winner as target
-        on="id"
-    )
-    Xy_2019 = pd.merge(
-        df_results[2019].drop(["winner"], axis=1),  # drop 2019 winner category
-        df_results[2021][["id", "winner"]],         # merge 2021 winner as target
-        on="id"
-    )
-    Xy = pd.concat([Xy_2015, Xy_2019], ignore_index=True)
+    # concat all individual Xy into a single df and merge with census
+    Xy = pd.concat(Xy, ignore_index=True)
     Xy = pd.merge(Xy, df_census, on="id")
 
     ids = Xy["id"]
     y = Xy["winner"]
     X = Xy.drop(["id", "winner"], axis = 1)
+    return ids, X, y
 
-    print(ids)
-    print(y)
-    print(X)
+def main():
+    df_census = prepare_census()
+    # print(df_census.info())
+
+    df_elections = prepare_elections()
+    # print(df_elections[2021].info())
+    # print(df_elections[2019].info())
+    # print(df_elections[2015].info())
+
+    ids, X, y = make_xy(
+        df_census, 
+        df_elections, 
+        target_class="winner",
+        merge_class="id"
+    )
+    # print(ids)
+    # print(y)
+    # print(X)
 
 if __name__ == "__main__":
     main()
