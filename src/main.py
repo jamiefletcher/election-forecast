@@ -4,9 +4,9 @@ import pandas as pd
 
 # Constants
 CENSUS_2013R = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
-ELECTION_2021 = "data/Results/44th_table_tableau12.csv"
-ELECTION_2019 = "data/Results/43rd_table_tableau12.csv"
-ELECTION_2015 = "data/Results/42nd_table_tableau12.csv"
+ELECTION_2021_T12 = "data/Results/44th_table_tableau12.csv"
+ELECTION_2019_T12 = "data/Results/43rd_table_tableau12.csv"
+ELECTION_2015_T12 = "data/Results/42nd_table_tableau12.csv"
 ZERO_COUNTS = 0.25
 BLANK_RECORD = {
     "id": 0 , 
@@ -116,53 +116,52 @@ def load_results_t12(filepath, year):
         results.append(record) 
     return results
 
-def main():
+def prepare_census():
     print("Reading Census Data ... ", end="", flush=True)
     census_2013_ridings = load_census(CENSUS_2013R, geo_level="Federal electoral district")
-    df = pd.DataFrame.from_records(census_2013_ridings.data)
-    df.set_index("id", inplace=True)
+    df_census = pd.DataFrame.from_records(census_2013_ridings.data)
+    df_census.set_index("id", inplace=True)
     print("Done")
 
-    print("Reading Election Data ... ", end="", flush=True)
-    df_results_2021 = pd.DataFrame.from_records(data = load_results_t12(ELECTION_2021, year=2021))
-    df_results_2021.set_index("id", inplace=True)
-    df_results_2021.drop(['year'], axis = 1, inplace = True)
-    df_results_2021.rename(
-        columns={"winner":"winner-21", "LIB":"LIB-21", "CON":"CON-21", "NDP":"NDP-21", "GRN":"GRN-21", "BQ":"BQ-21", "OTH":"OTH-21"},
-        inplace = True
-    )
-
-    df_results_2019 = pd.DataFrame.from_records(data = load_results_t12(ELECTION_2019, year=2019))
-    df_results_2019.set_index("id", inplace=True)
-    df_results_2019.drop(['year'], axis = 1, inplace = True)
-    df_results_2019.rename(
-        columns={"winner":"winner-19", "LIB":"LIB-19", "CON":"CON-19", "NDP":"NDP-19", "GRN":"GRN-19", "BQ":"BQ-19", "OTH":"OTH-19"},
-        inplace = True
-    )
-
-    df_results_2015 = pd.DataFrame.from_records(load_results_t12(ELECTION_2015, year=2015))
-    df_results_2015.set_index("id", inplace=True)
-    df_results_2015.drop(['year'], axis = 1, inplace = True)
-    df_results_2015.rename(
-        columns={"winner":"winner-15", "LIB":"LIB-15", "CON":"CON-15", "NDP":"NDP-15", "GRN":"GRN-15", "BQ":"BQ-15", "OTH":"OTH-15"},
-        inplace = True
-    )
-    print("Done")
-
-    print(df_results_2021)
-    print(df_results_2019)
-    print(df_results_2015)
-
-    # print(df.shape)
     print(f"Dropping census features with missing data ... ", end="")
-    df.drop(fields_to_drop(df, zero_thresh=ZERO_COUNTS), axis = 1, inplace=True)
-    # print(df.shape)
+    df_census.drop(fields_to_drop(df_census, zero_thresh=ZERO_COUNTS), axis = 1, inplace=True)
     print("Done")
 
-    # df.info()
-    print(df)
+    print(f"Dropping guid and name features ... ", end="")
+    df_census.drop(["guid", "name"], axis = 1, inplace = True)
+    print("Done")
 
+    return df_census
 
+def prepare_results():
+    print("Reading Election Data ... ", end="", flush=True)    
+    years = {
+        2021: ELECTION_2021_T12,
+        2019: ELECTION_2019_T12,
+        2015: ELECTION_2015_T12
+    }
+    dfs = {}    
+    for year, path in years.items():
+        df = pd.DataFrame.from_records(data = load_results_t12(path, year))
+        df.set_index("id", inplace=True)
+        df.drop(["year"], axis = 1, inplace = True)
+        df.rename(
+            columns={"winner":f"winner-{year}", "LIB":f"LIB-{year}", "CON":f"CON-{year}", 
+                     "NDP":f"NDP-{year}", "GRN":f"GRN-{year}", "BQ":f"BQ-{year}", "OTH":f"OTH-{year}"},
+            inplace = True
+        )
+        dfs[year] = df
+    print("Done")
+    return dfs
+
+def main():
+    df_results = prepare_results()
+    print(df_results[2021])
+    print(df_results[2019])
+    print(df_results[2015])
+
+    df_census = prepare_census()
+    print(df_census)
 
 if __name__ == "__main__":
     main()
