@@ -17,8 +17,6 @@ ELECTION_2015_T9 = "data/Results/42nd_table_tableau09.csv"
 ZERO_COUNTS = 0.25
 BLANK_RECORD = {
     "id": 0 , 
-    "year": 0, 
-    "winner": "", 
     "LIB": 0, 
     "CON": 0, 
     "NDP": 0, 
@@ -115,7 +113,6 @@ def load_results_t12(filepath, year):
                 curr_id = id
                 record = BLANK_RECORD.copy()
                 record["id"] = id
-                record["year"] = year
             if winner != "":
                 record["winner"] = winner
             record[party] += pct
@@ -125,20 +122,15 @@ def load_results_t12(filepath, year):
 
 def load_results_t9(filepath, year):
     record = BLANK_RECORD.copy()
+    record["id"] = 1                    # using the national totals as weights, so keep id field as 1 (no scaling)
     with open(filepath) as csvfile:
         dialect = csv.Sniffer().sniff(csvfile.read(1024))
         csvfile.seek(0)
         csvreader = csv.DictReader(csvfile, dialect=dialect)
         for row in csvreader:
-            # print(row)
             party = prase_party(row["\ufeffPolitical affiliation/Appartenance politique"])
             pct = float(row["Total"])/100
             record[party] += pct
-            if party == "OTH":
-                print(row["Total"], pct, record[party])
-    record.pop("year")
-    record.pop("id")
-    record.pop("winner")
     return record
 
 def prepare_census():
@@ -188,7 +180,6 @@ def prepare_elections():
     print("Reading Election Data - Riding Level ... ", end="", flush=True)    
     for year, path in riding_results.items():
         df = pd.DataFrame.from_records(data = load_results_t12(path, year))
-        df.drop(["year"], axis = 1, inplace = True)
         dfs[year] = df
     print("Done")
     print("Reading Election Data - National Level ... ", end="", flush=True)    
@@ -233,9 +224,9 @@ def main():
         target_class="winner",
         merge_class="id"
     )
-    # print(ids)
-    # print(y)
-    # print(X)
+    print(ids)
+    print(y)
+    print(X)
 
 if __name__ == "__main__":
     main()
