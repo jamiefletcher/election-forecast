@@ -1,4 +1,5 @@
 import csv
+import enum
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -31,6 +32,10 @@ class CensusData:
         self.names = names
         self.fields = fields
         self.data = data
+
+class Op(enum.Enum):
+    mul = 1
+    div = 2
 
 def make_numeric(str):
     try:
@@ -164,6 +169,18 @@ def prepare_census():
 
     return df_census_scaled
 
+def scale_df(df, scaling_factors, op=Op.mul):
+    cat_cols = df.select_dtypes(exclude='number').columns.to_list()
+    df_cat = df[cat_cols]
+    df_num = df.drop(cat_cols, axis = 1)
+    if op == Op.mul:
+        df_num *= scaling_factors
+    elif op == Op.div:
+        df_num /= scaling_factors
+    else:
+        raise ValueError("Unexpected scaling operation")
+    return df_num.join(df_cat)
+
 def prepare_elections():
     riding_result_files = {
         2021: ELECTION_2021_T12,
@@ -189,9 +206,7 @@ def prepare_elections():
     print("Done")
     print("Rescale riding level data to multiples of national result ... ", end="", flush=True) 
     for year in riding_result_files.keys():
-        tmp_cat = riding_results[year][["id", "winner"]]            # can't do division on strings
-        tmp_num = riding_results[year].drop(["id", "winner"], axis = 1) / national_results[year]
-        riding_results_scaled[year] = tmp_num.join(tmp_cat)      
+        riding_results_scaled[year] = scale_df(riding_results[year], national_results[year], Op.div)
     print("Done")
     return riding_results_scaled, national_results
 
@@ -199,17 +214,12 @@ def make_xy(df_census, df_elections, target_class, merge_class):
     Xy = []
     riding_results, national_results = df_elections
     for year_target, df_target in riding_results.items():
-        scaling_factors = national_results[year_target]
-        target = df_target[[merge_class, target_class]]             # select winner as target
-        
-        # merge non-target dfs as X and target winner as y
+        target = df_target[[merge_class, target_class]]                 # select winner as target
         df_feat = [v for k, v in riding_results.items() if k != year_target] # non-target dfs
         for df in df_feat:
-            tmp_id = df[merge_class]                                # remove id to allow scaling
-            tmp = df.drop([merge_class, target_class], axis=1)      # drop existing winner cat
-            tmp *= scaling_factors                                  # scale by target national results
-            tmp = tmp.join(tmp_id)                                  # restore id to enable merge
-            Xy.append(pd.merge(tmp, target, on=merge_class))        # merge target winner cat
+            tmp = df.drop([target_class], axis=1)                       # drop existing winner cat
+            tmp = scale_df(tmp, national_results[year_target], Op.mul)  # scale riding back up by target national result
+            Xy.append(pd.merge(tmp, target, on=merge_class))            # merge target winner cat
 
     # concat all individual Xy into a single df and merge with census
     Xy = pd.concat(Xy, ignore_index=True)
@@ -235,8 +245,8 @@ def main():
         target_class="winner",
         merge_class="id"
     )
-    print(ids)
-    print(y)
+    # print(ids)
+    print(y.value_counts())
     print(X)
 
 if __name__ == "__main__":
