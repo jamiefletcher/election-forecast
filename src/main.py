@@ -181,6 +181,12 @@ def scale_df(df, scaling_factors, op=Op.mul):
         raise ValueError("Unexpected scaling operation")
     return df_num.join(df_cat)
 
+def fix_other(df):
+    df.drop(["OTH"], axis = 1, inplace = True)
+    df["OTH"] = 1.0 - df["LIB"] - df["CON"] - df["NDP"] - df["GRN"] - df["BQ"]
+    df["OTH"] = df["OTH"].clip(lower = 0)
+    return df
+
 def prepare_elections():
     riding_result_files = {
         2021: ELECTION_2021_T12,
@@ -219,16 +225,13 @@ def make_xy(df_census, df_elections, target_class, merge_class):
         for df in df_feat:
             tmp = df.drop([target_class], axis=1)                       # drop existing winner cat
             tmp = scale_df(tmp, national_results[year_target], Op.mul)  # scale riding back up by target national result
+            tmp = fix_other(tmp)                                        # re-compute "OTH" so totals sum to 1.0
             Xy.append(pd.merge(tmp, target, on=merge_class))            # merge target winner cat
 
     # concat all individual Xy into a single df and merge with census
     Xy = pd.concat(Xy, ignore_index=True)
     Xy = pd.merge(Xy, df_census, on="id")
-
-    ids = Xy["id"]
-    y = Xy["winner"]
-    X = Xy.drop(["id", "winner"], axis = 1)
-    return ids, X, y
+    return Xy["id"], Xy.drop(["id", "winner"], axis = 1), Xy["winner"]
 
 def main():
     df_census = prepare_census()
