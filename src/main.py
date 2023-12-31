@@ -176,6 +176,7 @@ def prepare_elections():
         2015: ELECTION_2015_T9
     }
     riding_results = {}
+    riding_results_scaled = {}
     national_results = {}  
     print("Reading election data - riding level ... ", end="", flush=True)    
     for year, path in riding_result_files.items():
@@ -188,22 +189,26 @@ def prepare_elections():
     print("Done")
     print("Rescale riding level data to multiples of national result ... ", end="", flush=True) 
     for year in riding_result_files.keys():
-        tmp_cat = riding_results[year][["id", "winner"]]                       # can't do division on strings
+        tmp_cat = riding_results[year][["id", "winner"]]            # can't do division on strings
         tmp_num = riding_results[year].drop(["id", "winner"], axis = 1) / national_results[year]
-        riding_results[year] = tmp_num.join(tmp_cat)      
+        riding_results_scaled[year] = tmp_num.join(tmp_cat)      
     print("Done")
-    return riding_results, national_results
+    return riding_results_scaled, national_results
 
 def make_xy(df_census, df_elections, target_class, merge_class):
     Xy = []
-    df_riding_results, df_national_results = df_elections
-    election_list = [x for x in df_riding_results.items()]               # convert map -> list
-    for k_target, df_target in election_list:
-        target = df_target[[merge_class, target_class]]             # only target and id class (for merge)
-        df_feat = [v for k, v in election_list if k != k_target]    # complement of list (i.e. non-target dfs)
+    riding_results, national_results = df_elections
+    for year_target, df_target in riding_results.items():
+        scaling_factors = national_results[year_target]
+        target = df_target[[merge_class, target_class]]             # select winner as target
+        
+        # merge non-target dfs as X and target winner as y
+        df_feat = [v for k, v in riding_results.items() if k != year_target] # non-target dfs
         for df in df_feat:
-            tmp = df.drop([target_class], axis=1)                   # drop existing winner cat
-            # TODO rescale
+            tmp_id = df[merge_class]                                # remove id to allow scaling
+            tmp = df.drop([merge_class, target_class], axis=1)      # drop existing winner cat
+            tmp *= scaling_factors                                  # scale by target national results
+            tmp = tmp.join(tmp_id)                                  # restore id to enable merge
             Xy.append(pd.merge(tmp, target, on=merge_class))        # merge target winner cat
 
     # concat all individual Xy into a single df and merge with census
