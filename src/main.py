@@ -1,13 +1,14 @@
 import csv
 import enum
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectFromModel
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-
 
 # Filepaths
 CENSUS_2013R = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
@@ -174,15 +175,14 @@ def prepare_census():
     num_cols = df_census.select_dtypes(include="number").columns.to_list()
     num_pipeline = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler())
     preprocessing = ColumnTransformer(
-        [("num", num_pipeline, num_cols)], remainder="passthrough"
+        [("num", num_pipeline, num_cols)],
+        remainder="passthrough",
+        verbose_feature_names_out=False,
     )
-    df_census_scaled = preprocessing.fit_transform(df_census)
-    # Convert back to pd.DataFrame
-    feature_names = preprocessing.get_feature_names_out()
-    # id column needs to keep its name
-    id_idx = np.argwhere(feature_names == "remainder__id")[0]
-    feature_names[id_idx] = "id"
-    df_census_scaled = pd.DataFrame(data=df_census_scaled, columns=feature_names)
+    df_census_scaled = pd.DataFrame(
+        data=preprocessing.fit_transform(df_census),
+        columns=preprocessing.get_feature_names_out(),
+    )
     print("Done")
     return df_census_scaled
 
@@ -230,11 +230,7 @@ def prepare_elections():
     for year, path in national_result_files.items():
         national_results[year] = load_results_t9(path)
     print("Done")
-    print(
-        "Rescale riding level data to multiples of national result ... ",
-        end="",
-        flush=True,
-    )
+    print("Rescale riding level data ... ", end="", flush=True)
     for year in riding_result_files.keys():
         riding_results_scaled[year] = scale_df(
             riding_results[year], national_results[year], Op.div
@@ -267,19 +263,25 @@ def make_xy(df_census, df_elections, target_class, merge_class):
     return Xy["id"], Xy.drop(["id", "winner"], axis=1), Xy["winner"]
 
 
+def feature_select(X, y, random=None):
+    n_trees = 10
+    rf = RandomForestClassifier(n_estimators=n_trees, random_state=random)
+    select = SelectFromModel(estimator=rf).fit(X, y)
+    return pd.DataFrame(
+        data=select.transform(X), columns=select.get_feature_names_out()
+    )
+
+
 def main():
     df_census = prepare_census()
-    # print(df_census.info())
-
     df_elections = prepare_elections()
-    # print(df_elections[2021].info())
-    # print(df_elections[2019].info())
-    # print(df_elections[2015].info())
-
     _, X, y = make_xy(df_census, df_elections, target_class="winner", merge_class="id")
     # print(ids)
     print(y.value_counts())
-    print(X)
+    print(X.shape)
+    X_select = feature_select(X, y)
+    print(X_select.shape)
+    print(X_select.head())
 
 
 if __name__ == "__main__":
