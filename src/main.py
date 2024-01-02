@@ -7,8 +7,13 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sklearn.metrics import confusion_matrix, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 # Filepaths
 CENSUS_2013R = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
@@ -29,6 +34,7 @@ T9_PARTY = "\ufeffPolitical affiliation/Appartenance politique"
 T9_VOTE_PCT = "Total"
 ZERO_COUNTS = 0.25
 BLANK_RECORD = {"id": "", "LIB": 0, "CON": 0, "NDP": 0, "GRN": 0, "BQ": 0, "OTH": 0}
+TEST_SIZE = 0.2
 
 
 # Classes
@@ -153,25 +159,22 @@ def load_results_t9(filepath):
 
 
 def prepare_census():
-    print("Reading census data ... ", end="", flush=True)
+    print("Read census data ... ",  flush=True)
     census_2013_ridings = load_census(
         CENSUS_2013R, geo_level="Federal electoral district"
     )
     df_census = pd.DataFrame.from_records(census_2013_ridings.data)
     df_census.columns = df_census.columns.astype(str)
-    print("Done")
 
-    print("Dropping census features with missing data ... ", end="")
+    print("Drop census features with missing data ... ")
     df_census.drop(
         fields_to_drop(df_census, zero_thresh=ZERO_COUNTS), axis=1, inplace=True
     )
-    print("Done")
 
-    print("Dropping guid and name features ... ", end="")
+    print("Drop guid and name features ... ")
     df_census.drop(["guid", "name"], axis=1, inplace=True)
-    print("Done")
 
-    print("Rescale census data by Z-score ... ", end="")
+    print("Rescale census data by Z-score ... ")
     num_cols = df_census.select_dtypes(include="number").columns.to_list()
     num_pipeline = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler())
     preprocessing = ColumnTransformer(
@@ -183,7 +186,6 @@ def prepare_census():
         data=preprocessing.fit_transform(df_census),
         columns=preprocessing.get_feature_names_out(),
     )
-    print("Done")
     return df_census_scaled
 
 
@@ -221,21 +223,18 @@ def prepare_elections():
     riding_results = {}
     riding_results_scaled = {}
     national_results = {}
-    print("Reading election data - riding level ... ", end="", flush=True)
+    print("Read election data - riding level ... ")
     for year, path in riding_result_files.items():
         df = pd.DataFrame.from_records(data=load_results_t12(path))
         riding_results[year] = df
-    print("Done")
-    print("Reading election data - national level ... ", end="", flush=True)
+    print("Read election data - national level ... ")
     for year, path in national_result_files.items():
         national_results[year] = load_results_t9(path)
-    print("Done")
-    print("Rescale riding level data ... ", end="", flush=True)
+    print("Rescale riding level data ... ")
     for year in riding_result_files.keys():
         riding_results_scaled[year] = scale_df(
             riding_results[year], national_results[year], Op.div
         )
-    print("Done")
     return riding_results_scaled, national_results
 
 
@@ -272,16 +271,55 @@ def feature_select(X, y, random=None):
     )
 
 
+def model_select(ids, X, y, test_size, random=None, verbose=False):
+    models = {
+        "ridge": RidgeClassifier(),
+        "logit": LogisticRegression(max_iter=2000),
+        "rf": RandomForestClassifier(ccp_alpha=0.001),
+        "svc": SVC(),
+        "mlp": MLPClassifier(hidden_layer_sizes=(50, 20)),
+    }
+    class_labels = pd.unique(y)
+
+    print(
+        f"Split dataset into training ({100.0 - TEST_SIZE*100:.2f}%)"
+        f" and test ({TEST_SIZE*100:.2f}%) ..."
+    )
+    id_train, id_test, X_train, X_test, y_train, y_test = train_test_split(
+        ids, X, y, test_size=test_size, shuffle=True, random_state=random
+    )
+
+    print("Evaluate classification performance of various models ...")
+    for model_name, model in models.items():
+        model.fit(X_train, y_train)
+
+        y_pred_train = model.predict(X_train)
+        cm_train = confusion_matrix(y_train, y_pred_train, labels=class_labels)
+        f1_train = f1_score(y_train, y_pred_train, average="micro")
+
+        y_pred_test = model.predict(X_test)
+        cm_test = confusion_matrix(y_test, y_pred_test, labels=class_labels)
+        f1_test = f1_score(y_test, y_pred_test, average="micro")
+
+        print(
+            f" {model_name.ljust(8, ' ')} \t"
+            f" F1 (Train) = {f1_train:.4f} \t F1 (Test) = {f1_test:.4f}"
+        )
+        if verbose:
+            print("Confusion matrix - Training set")
+            print(cm_train, end="\n\n")
+            print("Confusion matrix - Test set")
+            print(cm_test, end="\n\n")
+
+
 def main():
     df_census = prepare_census()
     df_elections = prepare_elections()
-    _, X, y = make_xy(df_census, df_elections, target_class="winner", merge_class="id")
-    # print(ids)
-    print(y.value_counts())
-    print(X.shape)
+    ids, X, y = make_xy(
+        df_census, df_elections, target_class="winner", merge_class="id"
+    )
     X_select = feature_select(X, y)
-    print(X_select.shape)
-    print(X_select.head())
+    model_select(ids, X_select, y, test_size=TEST_SIZE)
 
 
 if __name__ == "__main__":
