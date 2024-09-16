@@ -117,22 +117,22 @@ def fields_to_drop(df, zero_thresh=0.2, missing=-999):
 
 
 def prepare_census(input_file):
-    print("Read census data ... ", flush=True)
+    print("- Read census data ...", flush=True)
     census_2013_ridings = load_census(
         input_file, geo_level="Federal electoral district"
     )
     df_census = pd.DataFrame.from_records(census_2013_ridings.data)
     df_census.columns = df_census.columns.astype(str)
 
-    print("Drop census features with missing data ... ")
+    print("- Drop census features with missing data ...")
     df_census.drop(
         fields_to_drop(df_census, zero_thresh=ZERO_COUNT_THRESH), axis=1, inplace=True
     )
 
-    print("Drop guid and name features ... ")
+    print("- Drop guid and name features ...")
     df_census.drop(["guid", "name"], axis=1, inplace=True)
 
-    print("Rescale census data by Z-score ... ")
+    print("- Rescale census data by Z-score ...")
     num_cols = df_census.select_dtypes(include="number").columns.to_list()
     num_pipeline = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler())
     preprocessing = ColumnTransformer(
@@ -151,16 +151,16 @@ def prepare_elections(riding_files, national_files):
     riding_results = {}
     riding_results_scaled = {}
     national_results = {}
-    print("Read election data - riding level ... ")
+    print("- Read local election results ...")
     for year, path in riding_files.items():
         df = pd.DataFrame.from_records(data=load_results_t12(path))
         riding_results[year] = df
 
-    print("Read election data - national level ... ")
+    print("- Read national election results ...")
     for year, path in national_files.items():
         national_results[year] = load_results_t9(path)
 
-    print("Rescale riding level data ... ")
+    print("- Rescale local election results ...")
     for year in riding_files.keys():
         riding_results_scaled[year] = scale_df(
             riding_results[year], national_results[year], ScalingOp.div
@@ -171,6 +171,8 @@ def prepare_elections(riding_files, national_files):
 def merge_dfs(df_census, df_elections, target_class, merge_class):
     Xy = []
     riding_results, national_results = df_elections
+
+    print("- Scale each set of local results by national totals ...")
     for year_target, df_target in riding_results.items():
         # select winner as target
         target = df_target[[merge_class, target_class]]
@@ -189,5 +191,7 @@ def merge_dfs(df_census, df_elections, target_class, merge_class):
 
     # concat all individual Xy into a single df and merge with census
     Xy = pd.concat(Xy, ignore_index=True)
+
+    print("- Merge election results with census data ...")
     Xy = pd.merge(Xy, df_census, on="id")
     return Xy

@@ -34,18 +34,23 @@ models = {
 test_size = 0.2
 
 def main():
+    print("Part I. Data Preparation")
     df_census = prepare_census(census_2013r)
     df_elections = prepare_elections(riding_results, national_results)
     dataset = merge_dfs(
         df_census, df_elections, target_class="winner", merge_class="id"
     )
-
     ids = dataset["id"]
     X = dataset.drop(["id", "winner"], axis=1)
     y = dataset["winner"]
 
+    print("\nPart II. Feature Selection")
     X_select = feature_select(X, y)
-    model_select(ids, X_select, y, models, test_size=test_size)
+
+    print("\nPart III. Model Selection")
+    selection_results = model_select(ids, X_select, y, models, test_size=test_size, verbose=True)
+    best_model = selection_results[0]["model"]
+    print(best_model)
 
 
 if __name__ == "__main__":
