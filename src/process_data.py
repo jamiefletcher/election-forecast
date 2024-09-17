@@ -176,9 +176,7 @@ def merge_dfs(df_census, df_ridings, df_national, target_class, merge_class):
         # select winner as target
         target = df_target[[merge_class, target_class]]
         
-        # non-target dfs
-        df_feat = [v for k, v in df_ridings.items() if k != year_target]
-        for df in df_feat:
+        for df in df_ridings.values():
             # drop existing winner cat
             tmp = df.drop([target_class], axis=1)
             # scale riding back up by target national result
