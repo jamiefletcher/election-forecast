@@ -1,3 +1,5 @@
+from datetime import date
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
@@ -33,24 +35,61 @@ models = {
 # Test-Train Split
 test_size = 0.2
 
-def main():
-    print("Part I. Data Preparation")
-    df_census = prepare_census(census_2013r)
-    df_elections = prepare_elections(riding_results, national_results)
+
+def data_prep(df_census, df_ridings, df_national):
     dataset = merge_dfs(
-        df_census, df_elections, target_class="winner", merge_class="id"
+        df_census, df_ridings, df_national, target_class="winner", merge_class="id"
     )
     ids = dataset["id"]
     X = dataset.drop(["id", "winner"], axis=1)
     y = dataset["winner"]
+    return ids, X, y
 
-    print("\nPart II. Feature Selection")
+
+def train_model(ids, X, y):
     X_select = feature_select(X, y)
+    selection_results = model_select(
+        ids, X_select, y, models, test_size=test_size, verbose=True
+    )
+    return selection_results[0]["model"], X_select.columns
 
-    print("\nPart III. Model Selection")
-    selection_results = model_select(ids, X_select, y, models, test_size=test_size, verbose=True)
-    best_model = selection_results[0]["model"]
-    print(best_model)
+
+# def polls_predict(model, df_census, df_ridings, df_national, best_features, base_year):
+#     this_year = int(date.today().strftime("%Y"))
+#     df_ridings_predict = {this_year: df_ridings[base_year]}
+
+#     # TODO Replace this with current poll average
+#     df_national_predict = {this_year: df_national[base_year]}
+
+#     dataset = merge_dfs(
+#         df_census,
+#         df_ridings_predict,
+#         df_national_predict,
+#         target_class="winner",
+#         merge_class="id",
+#     )
+
+#     ids = dataset["id"]
+#     X = dataset[best_features]
+#     y = model.predict(X)
+#     return ids, y
+
+
+def main():
+    print("Part I. Load Data")
+    df_census = prepare_census(census_2013r)
+    df_ridings, df_national = prepare_elections(riding_results, national_results)
+
+    print("Part II. Data Preparation")
+    ids, X, y = data_prep(df_census, df_ridings, df_national)
+
+    print("\nPart III. Feature and Model Selection")
+    best_model, best_features = train_model(ids, X, y)
+
+    # print("\nPart IV. Get Latest Polling and Predict")
+    # ids_predict, y_predict = polls_predict(
+    #     best_model, df_census, df_ridings, df_national, best_features, base_year=2021
+    # )
 
 
 if __name__ == "__main__":

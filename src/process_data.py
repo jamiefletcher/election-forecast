@@ -168,22 +168,21 @@ def prepare_elections(riding_files, national_files):
     return riding_results_scaled, national_results
 
 
-def merge_dfs(df_census, df_elections, target_class, merge_class):
+def merge_dfs(df_census, df_ridings, df_national, target_class, merge_class):
     Xy = []
-    riding_results, national_results = df_elections
 
     print("- Scale each set of local results by national totals ...")
-    for year_target, df_target in riding_results.items():
+    for year_target, df_target in df_ridings.items():
         # select winner as target
         target = df_target[[merge_class, target_class]]
         
         # non-target dfs
-        df_feat = [v for k, v in riding_results.items() if k != year_target]
+        df_feat = [v for k, v in df_ridings.items() if k != year_target]
         for df in df_feat:
             # drop existing winner cat
             tmp = df.drop([target_class], axis=1)
             # scale riding back up by target national result
-            tmp = scale_df(tmp, national_results[year_target], ScalingOp.mul)
+            tmp = scale_df(tmp, df_national[year_target], ScalingOp.mul)
             # re-compute "OTH" so totals sum to 1.0
             tmp = fix_other(tmp)
             # merge target winner cat
