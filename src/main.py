@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
@@ -67,11 +68,10 @@ def polls_predict(model, df_census, df_ridings, df_polls, best_features, riding_
     )
     dataset_2023 = project_ridings(dataset_2013, riding_conv)
 
-    # return dataset
-    ids = dataset_2023["id"].to_numpy()
-    X = dataset_2023[best_features]
-    y = model.predict(X)
-    return np.stack([ids, y], axis=1)
+    ids = dataset_2023["id"]
+    y = model.predict(dataset_2023[best_features])
+    y = pd.Series(data=y, name="winner")
+    return pd.concat((ids, y), axis=1)
 
 
 def main():
@@ -97,8 +97,8 @@ def main():
         best_features, 
         conv_2013_2023
     )
-    print(predict)
-    # np.savetxt("outputs/predict_3.csv", predict, delimiter=",")
+    print("- Results summary:")
+    print(predict.groupby("winner").count())
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,11 @@
 import pandas as pd
 from utils import ScalingOp, scale_df, fix_other
 
+import warnings
+
+# Disable annoying warning -- see: https://stackoverflow.com/a/76306267
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+
 def scale_polling(df_census, df_ridings, df_polls, target_class, merge_class):
     print("- Scale local results by national poll totals ...")
     tmp = df_ridings.drop([target_class], axis=1)
