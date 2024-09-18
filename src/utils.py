@@ -11,6 +11,7 @@ PARTIES = {
     "CON": "Conservative",
     "NDP": "New Democratic Party",
     "BQ": "Bloc Québécois",
+    "GRN": "Green Party",
 }
 
 
@@ -45,7 +46,8 @@ def parse_party(candidate_name):
 
 
 def fix_other(df):
-    df.drop(["OTH"], axis=1, inplace=True)
+    if "OTH" in df.columns:
+        df.drop(["OTH"], axis=1, inplace=True)
     df["OTH"] = 1.0 - df["LIB"] - df["CON"] - df["NDP"] - df["GRN"] - df["BQ"]
     df["OTH"] = df["OTH"].clip(lower=0)
     return df
