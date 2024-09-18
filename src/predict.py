@@ -11,6 +11,7 @@ def scale_polling(df_census, df_ridings, df_polls, target_class, merge_class):
     return pd.merge(tmp, df_census, on=merge_class)
 
 def project_ridings(df, scaling_factors):
+    print("- Re-project dataset from 2013 -> 2023 riding boundaries ...")
     new_rows = []
     for id_new, v in scaling_factors.items():
         for id_old, factor in v.items():
