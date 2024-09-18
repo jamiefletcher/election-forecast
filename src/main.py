@@ -1,12 +1,16 @@
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
-from process_data import merge_dfs, prepare_census, prepare_elections, compute_scaling_factors
-from predict import scale_polling, project_ridings
+from predict import latest_polls, project_ridings, scale_polling
+from process_data import (
+    compute_scaling_factors,
+    merge_dfs,
+    prepare_census,
+    prepare_elections,
+)
 from train import feature_select, model_select
 
 # 2021 Census - (Old) 2013 Ridings
@@ -26,6 +30,9 @@ national_results = {
     2019: "data/Results/43rd_table_tableau09.csv",
     2015: "data/Results/42nd_table_tableau09.csv",
 }
+
+# Recent Polling
+wiki_polls = "https://en.wikipedia.org/wiki/Opinion_polling_for_the_45th_Canadian_federal_election"
 
 # Model Types to Compare
 models = {
@@ -79,6 +86,7 @@ def main():
     df_census = prepare_census(census_2013r)
     df_ridings, df_national = prepare_elections(riding_results, national_results)
     conv_2013_2023 = compute_scaling_factors(riding_areas)
+    poll_average = latest_polls(wiki_polls)
 
     print("\nPart II. Data Preparation")
     ids, X, y = data_prep(df_census, df_ridings, df_national)
@@ -87,18 +95,17 @@ def main():
     best_model, best_features = train_model(ids, X, y)
 
     print("\nPart IV. Get Latest Polling and Predict")
-    df_ridings_2021 = df_ridings[2021]
-    df_poll_average = df_national[2021] # TODO Replace with actual polling
     predict = polls_predict(
-        best_model, 
-        df_census, 
-        df_ridings_2021, 
-        df_poll_average, 
-        best_features, 
-        conv_2013_2023
+        best_model,
+        df_census,
+        df_ridings[2015],
+        poll_average,
+        best_features,
+        conv_2013_2023,
     )
     print("- Results summary:")
     print(predict.groupby("winner").count())
+
 
 if __name__ == "__main__":
     main()
