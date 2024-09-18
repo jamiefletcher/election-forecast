@@ -19,6 +19,5 @@ def project_ridings(df, scaling_factors):
             tmp["id"] = str(id_new)
             new_rows.append(tmp)
     new_df = pd.concat(new_rows)
-    new_df = new_df.copy() # de-fragment
     new_df = new_df.groupby("id", as_index=False).sum()
     return new_df
