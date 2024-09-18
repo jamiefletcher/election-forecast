@@ -1,5 +1,3 @@
-from datetime import date
-
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
@@ -7,7 +5,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
 from process_data import merge_dfs, prepare_census, prepare_elections, compute_scaling_factors
-from predict import scale_polling
+from predict import scale_polling, project_ridings
 from train import feature_select, model_select
 
 # 2021 Census - (Old) 2013 Ridings
@@ -59,18 +57,19 @@ def train_model(ids, X, y):
     return selection_results[0]["model"], X_select.columns
 
 
-def polls_predict(model, df_census, df_ridings, df_polls, best_features):
-    dataset = scale_polling(
+def polls_predict(model, df_census, df_ridings, df_polls, best_features, riding_conv):
+    dataset_2013 = scale_polling(
         df_census,
         df_ridings,
         df_polls,
         target_class="winner",
         merge_class="id",
     )
+    dataset_2023 = project_ridings(dataset_2013, riding_conv)
 
     # return dataset
-    ids = dataset["id"].to_numpy()
-    X = dataset[best_features]
+    ids = dataset_2023["id"].to_numpy()
+    X = dataset_2023[best_features]
     y = model.predict(X)
     return np.stack([ids, y], axis=1)
 
@@ -91,7 +90,12 @@ def main():
     df_ridings_2021 = df_ridings[2021]
     df_poll_average = df_national[2021] # TODO Replace with actual polling
     predict = polls_predict(
-        best_model, df_census, df_ridings_2021, df_poll_average, best_features
+        best_model, 
+        df_census, 
+        df_ridings_2021, 
+        df_poll_average, 
+        best_features, 
+        conv_2013_2023
     )
     print(predict)
     # np.savetxt("outputs/predict_3.csv", predict, delimiter=",")
