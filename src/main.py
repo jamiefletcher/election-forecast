@@ -6,11 +6,14 @@ from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
-from process_data import merge_dfs, prepare_census, prepare_elections
+from process_data import merge_dfs, prepare_census, prepare_elections, compute_scaling_factors
 from train import feature_select, model_select
 
 # 2021 Census - (Old) 2013 Ridings
 census_2013r = "data/CanCensus2021_2013Ridings/98-401-X2021010_English_CSV_data.csv"
+
+# Riding Boundaries - (Old) 2013 and (New) 2023
+riding_areas = "data/shp/intersect/ridings_2021-2023.csv"
 
 # National Election Results - 2015, 2019, 2021
 riding_results = {
@@ -80,6 +83,7 @@ def main():
     print("Part I. Load Data")
     df_census = prepare_census(census_2013r)
     df_ridings, df_national = prepare_elections(riding_results, national_results)
+    conv_2013_2023 = compute_scaling_factors(riding_areas)
 
     print("Part II. Data Preparation")
     ids, X, y = data_prep(df_census, df_ridings, df_national)

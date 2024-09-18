@@ -6,7 +6,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from utils import ScalingOp, make_numeric, scale_df, parse_party, fix_other
+from utils import ScalingOp, make_numeric, scale_df, parse_party, fix_other, normalize_df_col
 
 
 class CensusData:
@@ -192,3 +192,24 @@ def merge_dfs(df_census, df_ridings, df_national, target_class, merge_class):
     print("- Merge election results with census data ...")
     Xy = pd.merge(Xy, df_census, on="id")
     return Xy
+
+
+# Compute Scale_factor to convert 2021 riding -> 2023 riding
+# Scale_factor is based on 2021 population density and size of overlapping area
+def compute_scaling_factors(input_file):
+    factors = {}
+    ridings = pd.read_csv(input_file)
+    ridings["Scale_factor"] = ridings["Intersect_Area"] * ridings["2021_POP_CNT"] / ridings["2021_SHAPE_area"]
+
+    # Normalize Scale_factor so that it sums to 1.0 for each riding
+    ridings = normalize_df_col(ridings, "Scale_factor", group_by="2023_FED_NUM")
+
+    for row in ridings.itertuples():
+        id_2023 = row._4
+        id_2021 = row._1
+        
+        if id_2023 not in factors:
+            factors[id_2023] = {}
+        
+        factors[id_2023].update({id_2021: round(row.Scale_factor, 5)})
+    return factors

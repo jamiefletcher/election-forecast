@@ -49,3 +49,9 @@ def fix_other(df):
     df["OTH"] = 1.0 - df["LIB"] - df["CON"] - df["NDP"] - df["GRN"] - df["BQ"]
     df["OTH"] = df["OTH"].clip(lower=0)
     return df
+
+
+def normalize_df_col(df, col, group_by):
+    df["Subtotal"] = df.groupby(group_by)[col].transform("sum")
+    df[col] = df[col] / df["Subtotal"]
+    return df.drop(columns="Subtotal")
