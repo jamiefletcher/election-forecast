@@ -7,6 +7,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 
 from process_data import merge_dfs, prepare_census, prepare_elections, compute_scaling_factors
+from predict import scale_polling
 from train import feature_select, model_select
 
 # 2021 Census - (Old) 2013 Ridings
@@ -53,26 +54,21 @@ def data_prep(df_census, df_ridings, df_national):
 def train_model(ids, X, y):
     X_select = feature_select(X, y)
     selection_results = model_select(
-        ids, X_select, y, models, test_size=test_size, verbose=True
+        ids, X_select, y, models, test_size=test_size, verbose=False
     )
     return selection_results[0]["model"], X_select.columns
 
 
-def polls_predict(model, df_census, df_ridings, df_national, best_features, base_year):
-    this_year = int(date.today().strftime("%Y"))
-    df_ridings_predict = {this_year: df_ridings[base_year]}
-
-    # TODO Replace this with current poll average
-    df_national_predict = {this_year: df_national[base_year]}
-
-    dataset = merge_dfs(
+def polls_predict(model, df_census, df_ridings, df_polls, best_features):
+    dataset = scale_polling(
         df_census,
-        df_ridings_predict,
-        df_national_predict,
+        df_ridings,
+        df_polls,
         target_class="winner",
         merge_class="id",
     )
 
+    # return dataset
     ids = dataset["id"].to_numpy()
     X = dataset[best_features]
     y = model.predict(X)
@@ -85,17 +81,20 @@ def main():
     df_ridings, df_national = prepare_elections(riding_results, national_results)
     conv_2013_2023 = compute_scaling_factors(riding_areas)
 
-    print("Part II. Data Preparation")
+    print("\nPart II. Data Preparation")
     ids, X, y = data_prep(df_census, df_ridings, df_national)
 
     print("\nPart III. Feature and Model Selection")
     best_model, best_features = train_model(ids, X, y)
 
     print("\nPart IV. Get Latest Polling and Predict")
+    df_ridings_2021 = df_ridings[2021]
+    df_poll_average = df_national[2021] # TODO Replace with actual polling
     predict = polls_predict(
-        best_model, df_census, df_ridings, df_national, best_features, base_year=2021
+        best_model, df_census, df_ridings_2021, df_poll_average, best_features
     )
-
+    print(predict)
+    # np.savetxt("outputs/predict_3.csv", predict, delimiter=",")
 
 if __name__ == "__main__":
     main()

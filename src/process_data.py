@@ -190,7 +190,7 @@ def merge_dfs(df_census, df_ridings, df_national, target_class, merge_class):
     Xy = pd.concat(Xy, ignore_index=True)
 
     print("- Merge election results with census data ...")
-    Xy = pd.merge(Xy, df_census, on="id")
+    Xy = pd.merge(Xy, df_census, on=merge_class)
     return Xy
 
 
