@@ -60,7 +60,7 @@ def data_prep(df_census, df_ridings, df_national):
 def train_model(ids, X, y):
     X_select = feature_select(X, y)
     selection_results = model_select(
-        ids, X_select, y, models, test_size=test_size, verbose=False
+        ids, X_select, y, models, test_size=test_size, verbose=True
     )
     return selection_results[0]["model"], X_select.columns
 
@@ -98,7 +98,7 @@ def main():
     predict = polls_predict(
         best_model,
         df_census,
-        df_ridings[2015],
+        df_ridings[2021],
         poll_average,
         best_features,
         conv_2013_2023,
