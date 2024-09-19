@@ -3,6 +3,7 @@ name: Python application
 on:
   schedule:
   - cron: "14 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
