@@ -89,9 +89,7 @@ Confusion matrix - Test set
 
 ## Forecast
 
-Despite the current poll lead enjoyed by CON, LIB is still projected to win the next election. This somewhat surprising result could be due to:
-- the strong affinity many ridings have to a particular party
-- the fact the training data (2015, 2019, 2021 elections) were favourable to LIB
+The current forecast result, which uses the most recent polling data from Wikipedia, is available in the Github Actions logs. As of 28 April 2025, a strong LIB win is currently predicted.
 
 ### Example Output
 
