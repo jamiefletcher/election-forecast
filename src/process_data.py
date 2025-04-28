@@ -43,7 +43,6 @@ def load_census(filepath, geo_level="Province"):
         csvfile.seek(0)
         csvreader = csv.DictReader(csvfile, dialect=dialect)
         for row in csvreader:
-            print(row)
             riding_id = row["ALT_GEO_CODE"]
             guid = row["DGUID"]
             name = row["GEO_NAME"]
