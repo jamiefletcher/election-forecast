@@ -89,7 +89,21 @@ Confusion matrix - Test set
 
 ## Forecast
 
-The current forecast result, which uses the most recent polling data from Wikipedia, is available in the Github Actions logs. As of 28 April 2025, a strong LIB win is currently predicted.
+The current forecast result, which uses the average of the 5 most-recent polls from [Wikipedia](https://en.wikipedia.org/wiki/Opinion_polling_for_the_45th_Canadian_federal_election), is available in the [Github Actions logs](https://github.com/jamiefletcher/election-forecast/actions/). As of 28 April 2025, a LIB win is currently predicted. However, the strength of the win varies considerably depending on which of the various models performs best.
+
+Poll Average
+```
+{'CON': 39.97, 'LIB': 43.31, 'NDP': 7.16, 'BQ': 6.08, 'GRN': 1.58, 'OTH': 0.0}
+```
+
+Projection with `model = 'rf'`
+```
+winner     
+BQ       18
+CON     151
+LIB     165
+NDP       9
+``` 
 
 ### Example Output
 
