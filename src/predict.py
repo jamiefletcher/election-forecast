@@ -39,7 +39,7 @@ def project_ridings(df, scaling_factors):
 
 
 def remove_empty(str_list):
-    return [item for item in str_list if len(item) > 0]
+    return [item for item in str_list if len(item) > 0 and item.lower() not in ["tbd"]]
 
 
 def average_polls(df):

@@ -93,8 +93,10 @@ def main():
 
     print("\nPart III. Feature and Model Selection")
     best_model, best_features = train_model(ids, X, y)
+    print("- Best model on test dataset:", best_model)
 
     print("\nPart IV. Get Latest Polling and Predict")
+    print("- Average of recent polls:", poll_average)
     predict = polls_predict(
         best_model,
         df_census,
@@ -105,6 +107,7 @@ def main():
     )
     print("- Results summary:")
     print(predict.groupby("winner").count())
+    predict.to_csv("outputs/results.csv")
 
 
 if __name__ == "__main__":
