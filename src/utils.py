@@ -1,4 +1,5 @@
 import enum
+import json
 
 
 class ScalingOp(enum.Enum):
@@ -36,6 +37,20 @@ def make_numeric(string):
             return float(string)
         except ValueError:
             return -999
+
+
+def make_geojson(name: str, features: dict, output_filename: str):
+    geojson = {
+        "type": "FeatureCollection",
+        "name": name,
+        "crs": {
+            "type": "name",
+            "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"},
+        },
+        "features": features,
+    }
+    with open(output_filename, "w") as f:
+        json.dump(geojson, f, indent=4, ensure_ascii=False)
 
 
 def parse_party(candidate_name):
